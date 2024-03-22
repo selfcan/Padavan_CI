@@ -55,11 +55,21 @@ on:
         - Xiaoyu_C3
         - Xiaoyu_C5
         - ZTE_E8820S
+        - FCJ_G-AX1800
+        - Skspruce_WIA3300-10
         default: SIM_AX1800T
       plugins:
         description: 'json format string of include configs'
         required: true
         default: '{"vpnsvr":"n","vpncli":"n","vpncmd":"n","ss":"y","v2ray":"n","xray":"y","trojan":"y","ssobfs":"y","dnsforwarder":"n","adbyby":"n","adguardhome":"n","smartdns":"n","aliddns":"n","zerotier":"n","ddnsto":"n","wireguard":"n","frpc":"y","aldrive":"n","sqm":"y","mentohust":"n","scutclient":"n","njitclient":"n","minieap":"n","dogcom":"n"}'
+      usexraymin:
+        type: boolean
+        description: 'whether to use streamlined xray'
+        default: false
+      lanip:
+        description: 'custom lan ip instead of default'
+        required: true
+        default: '192.168.2.1'
       rainbowui:
         type: boolean
         description: 'apply rainbow ui'
@@ -93,9 +103,9 @@ jobs:
     if: github.event.repository.owner.id == github.event.sender.id
 
     steps:
-    - uses: actions/checkout@v3
-    - uses: hendrikmuhs/ccache-action@v1.2
-    - uses: kanga333/variable-mapper@master
+    - uses: actions/checkout@v4
+    - uses: hendrikmuhs/ccache-action@v1.2.12
+    - uses: Bonnie2980/variable-mapper@master
       id: export
       with:
         key: "${{ github.event.inputs.target }}"
@@ -245,15 +255,21 @@ jobs:
             "ZTE_E8820S": {
               "model": "ZTE-E8820S"
             },
+            "FCJ_G-AX1800": {
+              "model": "G-AX1800"
+            },
+            "Skspruce_WIA3300-10": {
+              "model": "WIA3300-10"
+            },
             ".*": {
               "model": "K2P"
             }
           }
         export_to: env
         mode: first_match
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
-        go-version: '1.21.1'
+        go-version: '1.21.4'
         check-latest: true
         cache-dependency-path: '**/go.sum'
     - name: Initialization environment
@@ -277,6 +293,16 @@ jobs:
         cd $WORK_PATH
         mkdir -p toolchain-mipsel/toolchain-4.4.x
         tar -Jxvf mipsel-linux-uclibc-gcc10.tar.xz -C toolchain-mipsel/toolchain-4.4.x
+    - name: Custom Lan IP
+      run: |
+        cp -f bashScripts/setlanip.sh $WORK_PATH/trunk
+        cd $WORK_PATH/trunk
+        sudo chmod +x setlanip.sh
+        if [ "${{ github.event.inputs.rainbowui }}" = "true" ]; then
+          bash ./setlanip.sh ./user/shared/defaults.h ./user/www/n56u_rainbow/Restarting.asp ${{ github.event.inputs.lanip }}
+        else
+          bash ./setlanip.sh ./user/shared/defaults.h ./user/www/n56u_ribbon_fixed/Restarting.asp ${{ github.event.inputs.lanip }}
+        fi
     - name: Apply rainbow themes
       if: github.event.inputs.rainbowui == 'true'
       run: |
@@ -396,6 +422,9 @@ jobs:
         echo "CONFIG_FIRMWARE_INCLUDE_TROJAN=${{env.trojan}}" >> .config #集成trojan执行文件(1.1M左右)
         echo "CONFIG_FIRMWARE_INCLUDE_SSOBFS=${{env.ssobfs}}" >> .config # simple-obfs混淆插件
         echo "CONFIG_FIRMWARE_INCLUDE_SSSERVER=n" >> .config #SS server
+        if [[ "${{env.xray}}" == "y" && "${{ github.event.inputs.usexraymin }}" == "true" ]]; then
+        sed -i 's/+= xray/+= xraymin/g' $WORK_PATH/trunk/user/Makefile
+        fi
         #
         echo "CONFIG_FIRMWARE_INCLUDE_SRELAY=n" >> .config #可以不集成
         echo "CONFIG_FIRMWARE_INCLUDE_TUNSAFE=n" >> .config #tunsafe
@@ -464,7 +493,7 @@ jobs:
         ./transfer anon --no-progress ${FIRMWARE} 2>&1 | tee anonfile.log
         echo "::warning file=anonfile.com::$(cat anonfile.log | grep -o -E "https?://[a-zA-Z0-9\.\/_&=@$%?~#-]*")"
     - name: Remove obsolete firmwares on artifacts
-      uses: c-hive/gha-remove-artifacts@v1.3.0
+      uses: Bonnie2980/gha-remove-artifacts@master
       if: env.STATUS == 'success'
       with:
         age: '1 day'
