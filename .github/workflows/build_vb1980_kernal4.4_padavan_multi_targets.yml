@@ -6,7 +6,7 @@ on:
       targets:
         description: 'targets to compile'
         required: true
-        default: "['SIM-AX1800T','HAR-20S2U1','CR660x','JCG-Q20']"
+        default: "['SIM-AX1800T','HAR-20S2U1','CR660x','B70']"
       plugins:
         description: 'json format string of include configs'
         required: true
@@ -18,7 +18,7 @@ on:
       lanip:
         description: 'custom lan ip instead of default'
         required: true
-        default: '192.168.2.1'
+        default: '10.10.10.10'
       rainbowui:
         type: boolean
         description: 'apply rainbow ui'
